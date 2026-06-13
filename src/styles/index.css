@@ -1036,3 +1036,114 @@ button { cursor: pointer; background: none; border: none; }
 @media (max-width: 480px) {
   .db-kpis { grid-template-columns: 1fr; }
 }
+.db-repos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.db-repo-card {
+  background: var(--surface-2);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-2);
+  padding: 0.9rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.db-repo-card:hover {
+  border-color: var(--amber-dim2);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+  transform: translateY(-1px);
+  transition: all 0.15s ease-out;
+}
+
+.db-repo-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.db-repo-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  margin-bottom: 0.15rem;
+}
+
+.db-repo-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.db-repo-chip {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.db-repo-chip--lang {
+  background: rgba(56, 189, 248, 0.08);
+  border-color: rgba(56, 189, 248, 0.3);
+  color: rgba(125, 211, 252, 1);
+}
+
+.db-repo-chip--private {
+  background: rgba(248, 250, 252, 0.02);
+  border-color: rgba(148, 163, 184, 0.4);
+  color: var(--text-muted);
+}
+
+.db-repo-link-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: 1px solid var(--border-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  background: rgba(15, 23, 42, 0.4);
+}
+
+.db-repo-link-btn:hover {
+  color: var(--amber);
+  border-color: var(--amber);
+  background: rgba(15, 23, 42, 0.9);
+}
+
+.db-repo-desc {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.db-repo-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.35rem;
+}
+
+.db-repo-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.db-repo-stat {
+  font-size: 0.75rem;
+  color: var(--text-faint);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}

@@ -3,6 +3,7 @@ import Navbar from '../components/layout/Navbar.jsx'
 import { useNavigate } from 'react-router-dom'
 import '../styles/index.css'
 
+
 /* ─── Icons ─────────────────────────────────────────────────── */
 const ArrowRight = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -19,6 +20,7 @@ const ShieldIcon = () => (
     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
   </svg>
 )
+
 
 /* ─── Mock Dashboard ─────────────────────────────────────────── */
 function MockDashboard() {
@@ -116,6 +118,7 @@ function MockDashboard() {
   )
 }
 
+
 /* ─── Features ───────────────────────────────────────────────── */
 function Features() {
   const list = [
@@ -135,7 +138,7 @@ function Features() {
       desc: 'Empresas locales, salarios en CLP/USD, contexto chileno y latinoamericano.' },
   ]
   return (
-    <section className="features-section" id="features">
+    <section className="features-section" id="features" data-testid="features-section">
       <div className="section-header">
         <p className="section-label">✦ Funcionalidades</p>
         <h2 className="section-title">Todo lo que necesitas en un solo lugar</h2>
@@ -143,7 +146,11 @@ function Features() {
       </div>
       <div className="features-grid">
         {list.map(f => (
-          <div key={f.title} className={`feature-card${f.featured ? ' feature-card-featured' : ''}${f.green ? ' feature-card-green' : ''}`}>
+          <div
+            key={f.title}
+            className={`feature-card${f.featured ? ' feature-card-featured' : ''}${f.green ? ' feature-card-green' : ''}`}
+            data-testid="feature-card"
+          >
             <div className="feature-icon-wrap">
               <span className="feature-icon">{f.icon}</span>
             </div>
@@ -159,6 +166,7 @@ function Features() {
   )
 }
 
+
 /* ─── How It Works ───────────────────────────────────────────── */
 function HowItWorks() {
   const steps = [
@@ -168,7 +176,7 @@ function HowItWorks() {
     { n: '04', icon: '🚀', title: 'Postula con un clic',     desc: 'Empleos ordenados por % de match real. Postula con tu CV especializado adjunto.' },
   ]
   return (
-    <section className="how-section" id="como-funciona">
+    <section className="how-section" id="como-funciona" data-testid="how-section">
       <div className="section-header">
         <p className="section-label">⏱ Cómo funciona</p>
         <h2 className="section-title">De cero a empleado en 4 pasos</h2>
@@ -176,7 +184,7 @@ function HowItWorks() {
       </div>
       <div className="steps-grid">
         {steps.map((s, i) => (
-          <div key={s.n} className="step">
+          <div key={s.n} className="step" data-testid="step">
             <div className="step-head">
               <span className="step-num">{s.n}</span>
               {i < steps.length - 1 && <span className="step-connector" />}
@@ -190,6 +198,7 @@ function HowItWorks() {
     </section>
   )
 }
+
 
 /* ─── Skills Showcase ────────────────────────────────────────── */
 function Skills() {
@@ -254,6 +263,7 @@ function Skills() {
   )
 }
 
+
 /* ─── Testimonials ───────────────────────────────────────────── */
 function Testimonials() {
   const items = [
@@ -285,6 +295,7 @@ function Testimonials() {
   )
 }
 
+
 /* ─── Landing Page ───────────────────────────────────────────── */
 export default function LandingPage() {
   const navigate = useNavigate()
@@ -300,7 +311,7 @@ export default function LandingPage() {
       <Navbar />
 
       {/* ── Hero ── */}
-      <section className="hero">
+      <section className="hero" data-testid="hero-section">
         <div className="hero-bg" aria-hidden="true">
           <div className="hero-grid" />
           <div className="hero-glow hero-glow-1" />
@@ -309,12 +320,12 @@ export default function LandingPage() {
         </div>
 
         <div className="hero-content">
-          <span className="hero-badge">
-            <span className="badge-dot" />
+          <span className="hero-badge" data-testid="hero-badge">
+            <span className="badge-dot" data-testid="badge-dot" />
             Tu código habla por ti
           </span>
 
-          <h1 className="hero-title">
+          <h1 className="hero-title" data-testid="hero-title">
             Tu GitHub es tu mejor{' '}
             <span className="amber">currículum</span>
             <br />
@@ -327,11 +338,11 @@ export default function LandingPage() {
           </p>
 
           <div className="hero-actions">
-            <button onClick={() => navigate('/auth/github')} className="btn-hero">
+            <button onClick={() => navigate('/auth/github')} className="btn-hero" data-testid="btn-cta-hero">
               <GithubIcon />
               Crear mi perfil gratis
             </button>
-            <a href="#como-funciona" className="btn-hero-outline">
+            <a href="#como-funciona" className="btn-hero-outline" data-testid="btn-how">
               Ver cómo funciona <ArrowRight />
             </a>
           </div>
@@ -350,9 +361,9 @@ export default function LandingPage() {
       </section>
 
       {/* ── Stats bar ── */}
-      <div className="stats-bar">
+      <div className="stats-bar" data-testid="stats-bar">
         {stats.map((s, i) => (
-          <div key={s.n} className="stat-item">
+          <div key={s.n} className="stat-item" data-testid="stat-item">
             <p className="stat-num">{s.n}</p>
             <p className="stat-label">{s.l}</p>
             {i < stats.length - 1 && <div className="stat-divider" />}
@@ -366,7 +377,7 @@ export default function LandingPage() {
       <Testimonials />
 
       {/* ── CTA Final ── */}
-      <section className="cta-section">
+      <section className="cta-section" data-testid="cta-section">
         <div className="cta-glow" aria-hidden="true" />
         <div className="cta-box">
           <span className="cta-badge">✦ Únete ahora</span>
@@ -377,7 +388,11 @@ export default function LandingPage() {
           <p className="cta-subtitle">
             Crea tu perfil en segundos con GitHub. Sin formularios, sin CVs manuales.
           </p>
-          <button onClick={() => navigate('/auth/github')} className="btn-hero-lg">
+          <button
+            onClick={() => navigate('/auth/github')}
+            className="btn-hero-lg"
+            data-testid="btn-cta-footer"
+          >
             <GithubIcon size={20} />
             Entrar con GitHub — es gratis
           </button>
@@ -388,7 +403,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── Footer ── */}
-      <footer className="footer">
+      <footer className="footer" data-testid="footer">
         <div className="footer-inner">
           <div className="footer-brand">
             <p className="footer-logo">⟨/⟩ DevRoom</p>

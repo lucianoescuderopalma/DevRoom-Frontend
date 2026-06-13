@@ -1,6 +1,9 @@
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/layout/Navbar.jsx'
+import api from '../api/axios'
 
+// ICONOS
 const IcMapPin = () => (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
@@ -37,17 +40,17 @@ const IcActivity = () => (
   </svg>
 )
 
-/* Datos básicos */
-const SKILLS = [
-  { name: 'Java',        pct: 92, level: 'Avanzado'   },
-  { name: 'Spring Boot', pct: 88, level: 'Avanzado'   },
-  { name: 'React',       pct: 80, level: 'Avanzado'   },
-  { name: 'TypeScript',  pct: 74, level: 'Intermedio' },
-  { name: 'PostgreSQL',  pct: 70, level: 'Intermedio' },
-  { name: 'Docker',      pct: 60, level: 'Intermedio' },
+// MOCKS de fallback
+const FALLBACK_SKILLS = [
+  { name: 'Java', pct: 92, level: 'Avanzado' },
+  { name: 'Spring Boot', pct: 88, level: 'Avanzado' },
+  { name: 'React', pct: 80, level: 'Avanzado' },
+  { name: 'TypeScript', pct: 74, level: 'Intermedio' },
+  { name: 'PostgreSQL', pct: 70, level: 'Intermedio' },
+  { name: 'Docker', pct: 60, level: 'Intermedio' },
 ]
 
-const REPOS = [
+const FALLBACK_REPOS = [
   {
     name: 'devroom-backend',
     lang: 'Java',
@@ -80,28 +83,116 @@ const EXPERIENCE = [
   },
 ]
 
+function skillLevelFromPct(pct) {
+  if (pct >= 80) return 'Avanzado'
+  if (pct >= 60) return 'Intermedio'
+  return 'Básico'
+}
+
 export default function PublicProfilePage() {
   const navigate = useNavigate()
+
+  const [profile, setProfile] = useState(null)
+  const [stats, setStats] = useState(null)
+  const [repos, setRepos] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    const fetchAll = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+
+        // 1) Perfil del usuario autenticado (UserProfileDTO)
+        const meRes = await api.get('/api/auth/me')
+        const me = meRes.data
+        setProfile(me)
+
+        // 2) Stats a partir de repos (lenguajes, commits, etc.)
+        const statsRes = await api.get('/api/profile/stats')
+        setStats(statsRes.data || null)
+
+        // 3) Repositorios públicos del usuario para destacar 3
+        if (me?.username) {
+          const reposRes = await api.get(`/api/users/${me.username}/repos`)
+          setRepos(reposRes.data || [])
+        }
+      } catch (err) {
+        setError('No se pudo cargar el perfil público.')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchAll()
+  }, [])
+
+  const initials =
+    profile?.name?.trim() ?
+      profile.name.trim().split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase() :
+      'LE'
+
+  const location = profile?.location || 'Santiago, Chile'
+  const role = profile?.role || 'Full Stack Developer · Java / Spring Boot · React'
+  const githubUrl = profile?.githubUrl || (profile?.username ? `https://github.com/${profile.username}` : 'https://github.com/')
+  const publicHandle = profile?.username ? `devroom.app/@${profile.username}` : 'devroom.app/@lescudero'
+
+  const skillsFromStats = stats?.skills?.length
+    ? stats.skills.map(s => ({
+        name: s.name,
+        pct: s.pct,
+        level: skillLevelFromPct(s.pct),
+      }))
+    : FALLBACK_SKILLS
+
+  const reposToShow =
+    repos && repos.length
+      ? repos
+          .filter(r => !r.isPrivate)
+          .slice(0, 3)
+          .map(r => ({
+            name: r.name,
+            lang: r.mainLanguage || 'N/A',
+            desc: r.description || 'Repositorio sin descripción.',
+            commits: r.commits ?? null,
+          }))
+      : FALLBACK_REPOS
+
+  const totalCommits = stats?.totalCommits ?? 0
+  const reposCount = stats?.reposCount ?? reposToShow.length
+  const distinctSkills = stats?.distinctSkills ?? skillsFromStats.length
 
   return (
     <>
       <Navbar
-  showMarketingLinks={false}
-  showLandingLink={true}
-  showDashboardLink={false}
-/>
+        showMarketingLinks={false}
+        showLandingLink={true}
+        showDashboardLink={false}
+      />
 
-      <main className="db-content" style={{maxWidth: '1100px', marginInline: 'auto',paddingTop: '96px',
-  }}>
+      <main
+        className="db-content"
+        style={{
+          maxWidth: '1100px',
+          marginInline: 'auto',
+          paddingTop: '96px',
+        }}
+      >
         {/* Header perfil */}
         <header className="db-page-header" style={{ marginBottom: '2rem' }}>
-          <div className="db-page-header-left" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+          <div
+            className="db-page-header-left"
+            style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}
+          >
             <div
               style={{
                 width: 72,
                 height: 72,
                 borderRadius: '9999px',
-                background: 'linear-gradient(135deg,#f59e0b,#10b981)',
+                background: profile?.avatarUrl
+                  ? `url(${profile.avatarUrl}) center/cover no-repeat`
+                  : 'linear-gradient(135deg,#f59e0b,#10b981)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -111,15 +202,15 @@ export default function PublicProfilePage() {
                 color: '#1e2330',
               }}
             >
-              LE
+              {!profile?.avatarUrl && initials}
             </div>
             <div>
               <p className="section-label">Perfil público</p>
               <h1 className="section-title" style={{ marginBottom: '0.5rem' }}>
-                Luciano Escudero
+                {profile?.name || 'Luciano Escudero'}
               </h1>
               <p className="db-page-sub">
-                Full Stack Developer · Java / Spring Boot · React
+                {role}
               </p>
               <div
                 style={{
@@ -131,21 +222,33 @@ export default function PublicProfilePage() {
                 }}
               >
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <IcMapPin /> Santiago, Chile
+                  <IcMapPin /> {location}
                 </span>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
                   <IcCalendar /> Desde mayo 2024
                 </span>
                 <a
-                  href="https://github.com/lescudero"
+                  href={githubUrl}
                   target="_blank"
                   rel="noreferrer"
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', color: '#38bdf8' }}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    color: '#38bdf8',
+                  }}
                 >
-                  <IcGithub /> github.com/lescudero
+                  <IcGithub /> {githubUrl.replace('https://', '')}
                 </a>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', color: '#7c8db5' }}>
-                  <IcLink /> devroom.app/@lescudero
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    color: '#7c8db5',
+                  }}
+                >
+                  <IcLink /> {publicHandle}
                 </span>
               </div>
             </div>
@@ -162,187 +265,259 @@ export default function PublicProfilePage() {
           </div>
         </header>
 
-        {/* Stats rápidas */}
-        <section className="stats-bar" style={{ padding: '2rem 0', marginBottom: '2.5rem' }}>
-          <div className="stats-inner">
-            <div className="stat-item">
-              <p className="stat-num">12</p>
-              <p className="stat-label">Repositorios conectados</p>
-            </div>
-            <div className="stat-item">
-              <p className="stat-num">87%</p>
-              <p className="stat-label">Score de perfil DevRoom</p>
-            </div>
-            <div className="stat-item">
-              <p className="stat-num">47</p>
-              <p className="stat-label">Commits esta semana</p>
-            </div>
+        {loading && (
+          <div style={{ marginBottom: '1rem', fontSize: '.8rem', color: 'var(--text-muted)' }}>
+            Cargando perfil público…
           </div>
-        </section>
+        )}
+        {error && (
+          <div style={{ marginBottom: '1rem', fontSize: '.8rem', color: 'var(--amber)' }}>
+            {error}
+          </div>
+        )}
 
-        {/* Grid principal */}
-        <div className="db-grid" style={{ gridTemplateColumns: '1.2fr 0.9fr' }}>
-          <div className="db-grid-left">
-            {/* Sobre mí */}
-            <section className="db-card">
-              <div className="db-card-head">
+        <section className="db-grid" style={{ alignItems: 'flex-start' }}>
+          {/* Columna izquierda: resumen + repos */}
+          <div className="db-col">
+            {/* Resumen breve */}
+            <article className="db-card" style={{ marginBottom: '1rem' }}>
+              <div className="db-card-hd">
                 <div className="db-card-title">Sobre mí</div>
               </div>
-              <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: 1.7 }}>
-                Desarrollador Full Stack con foco en <span className="amber">Java / Spring Boot</span> y{' '}
-                <span className="amber">React</span>. Me especializo en arquitecturas de microservicios, APIs REST
-                y experiencias de usuario limpias y rápidas.
+              <p
+                style={{
+                  fontSize: '.86rem',
+                  lineHeight: 1.7,
+                  color: 'var(--text-muted)',
+                }}
+              >
+                {profile?.bio ||
+                  'Desarrollador backend / full stack con foco en APIs limpias, buen diseño de dominios y productos que resuelven problemas reales.'}
               </p>
-              <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: 1.7, marginTop: '0.8rem' }}>
-                Actualmente construyendo <span className="amber">DevRoom</span>, una plataforma que analiza el perfil
-                de desarrolladores con IA y los conecta con empleos alineados a su stack. Disponible para proyectos
-                freelance y posiciones full‑time remotas.
-              </p>
-            </section>
+            </article>
 
             {/* Repos destacados */}
-            <section className="db-card">
-              <div className="db-card-head">
+            <article className="db-card">
+              <div className="db-card-hd">
                 <div className="db-card-title">
-                  <IcGithub />
-                  Repositorios destacados
+                  <IcGithub /> Repositorios destacados
                 </div>
               </div>
-              <div className="db-jobs-list">
-                {REPOS.map(r => (
-                  <div key={r.name} className="db-job-row">
-                    <div className="db-job-logo">{r.lang[0]}</div>
-                    <div className="db-job-info">
-                      <div className="db-job-title">{r.name}</div>
-                      <div className="db-job-meta">{r.desc}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
 
-            {/* Experiencia */}
-            <section className="db-card">
-              <div className="db-card-head">
-                <div className="db-card-title">Experiencia</div>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
-                {EXPERIENCE.map(exp => (
-                  <div key={exp.role} style={{ display: 'flex', gap: '0.85rem' }}>
-                    <div
-                      style={{
-                        width: 10,
-                        marginTop: 6,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: 4,
-                      }}
-                    >
-                      <span
-                        style={{
-                          width: 10,
-                          height: 10,
-                          borderRadius: '9999px',
-                          background: '#f59e0b',
-                        }}
-                      />
-                      <span
-                        style={{
-                          flex: 1,
-                          width: 1,
-                          background: 'var(--border)',
-                        }}
-                      />
+              <div className="db-jobs">
+                {reposToShow.map((repo) => (
+                  <div className="db-job" key={repo.name}>
+                    <div className="db-job-logo">
+                      {repo.name[0].toUpperCase()}
                     </div>
-                    <div>
-                      <p style={{ fontSize: '0.92rem', fontWeight: 700 }}>{exp.role}</p>
-                      <p style={{ fontSize: '0.85rem', color: 'var(--amber)' }}>{exp.company}</p>
-                      <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 2 }}>{exp.period}</p>
-                      <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.7 }}>
-                        {exp.desc}
+                    <div className="db-job-info">
+                      <div className="db-job-title">{repo.name}</div>
+                      <div className="db-job-meta">
+                        <span>{repo.lang}</span>
+                        {typeof repo.commits === 'number' && (
+                          <>
+                            <span className="db-dot" />
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem' }}>
+                              <IcActivity /> {repo.commits} commits
+                            </span>
+                          </>
+                        )}
+                      </div>
+                      <p
+                        style={{
+                          marginTop: '.3rem',
+                          fontSize: '.78rem',
+                          color: 'var(--text-muted)',
+                          lineHeight: 1.6,
+                        }}
+                      >
+                        {repo.desc}
                       </p>
                     </div>
                   </div>
                 ))}
               </div>
-            </section>
-          </div>
+            </article>
 
-          {/* Columna derecha */}
-          <div className="db-grid-right">
-            {/* Skills */}
-            <section className="db-card">
-              <div className="db-card-head">
-                <div className="db-card-title">Stack principal</div>
+            {/* Experiencia */}
+            <article className="db-card">
+              <div className="db-card-hd">
+                <div className="db-card-title">Experiencia</div>
               </div>
-              {SKILLS.map(s => (
-                <div key={s.name} className="skill-row">
-                  <span className="skill-name">{s.name}</span>
-                  <div className="skill-bar-bg">
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {EXPERIENCE.map((exp) => (
+                  <div key={exp.role}>
                     <div
-                      className={
-                        'skill-bar-fill ' +
-                        (s.pct >= 80 ? 'skill-bar-high' : s.pct >= 60 ? 'skill-bar-mid' : 'skill-bar-low')
-                      }
-                      style={{ width: `${s.pct}%` }}
-                    />
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        fontSize: '.8rem',
+                        marginBottom: '.25rem',
+                      }}
+                    >
+                      <span style={{ fontWeight: 600 }}>{exp.role}</span>
+                      <span style={{ color: 'var(--text-faint)' }}>{exp.period}</span>
+                    </div>
+                    <div
+                      style={{
+                        fontSize: '.78rem',
+                        color: 'var(--text-muted)',
+                        marginBottom: '.35rem',
+                      }}
+                    >
+                      {exp.company}
+                    </div>
+                    <p
+                      style={{
+                        fontSize: '.78rem',
+                        color: 'var(--text-muted)',
+                        lineHeight: 1.6,
+                      }}
+                    >
+                      {exp.desc}
+                    </p>
                   </div>
-                  <span
-                    className={
-                      'skill-level ' +
-                      (s.level === 'Avanzado'
-                        ? 'skill-level-high'
-                        : s.level === 'Intermedio'
-                        ? 'skill-level-mid'
-                        : 'skill-level-low')
-                    }
-                  >
-                    {s.level}
-                  </span>
-                </div>
-              ))}
-            </section>
-
-            {/* Snapshot DevRoom */}
-            <section className="db-card db-card--center">
-              <div className="db-card-head">
-                <div className="db-card-title">Resumen DevRoom</div>
+                ))}
               </div>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
-                Top 15% en perfiles Java / Spring Boot en LATAM.
-              </p>
-              <div className="stats-inner" style={{ gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
-                <div className="stat-item">
-                  <p className="stat-num" style={{ fontSize: '2rem' }}>
-                    12
-                  </p>
-                  <p className="stat-label">Repos analizados</p>
-                </div>
-                <div className="stat-item">
-                  <p className="stat-num" style={{ fontSize: '2rem' }}>
-                    7
-                  </p>
-                  <p className="stat-label">Skills detectadas</p>
-                </div>
-              </div>
-            </section>
-
-            {/* Actividad reciente */}
-            <section className="db-card">
-  <div className="db-card-head">
-    <div className="db-card-title">
-      <IcActivity />
-      Actividad reciente
-      </div>
-     </div>
-
-    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.7 }}>
-    47 commits esta semana. Actividad constante en proyectos de backend, frontend y mejoras de perfil público.
-    </p>
-    </section>
+            </article>
           </div>
-        </div>
+
+          {/* Columna derecha: stats + skills */}
+          <div className="db-col">
+            {/* Stats rápidos */}
+            <article className="db-card">
+              <div className="db-card-hd">
+                <div className="db-card-title">
+                  <IcActivity /> Actividad técnica
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(3, minmax(0,1fr))',
+                  gap: '.75rem',
+                }}
+              >
+                <div
+                  style={{
+                    background: 'var(--surface-2)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '10px',
+                    padding: '.75rem .9rem',
+                  }}
+                >
+                  <div style={{ fontSize: '.72rem', color: 'var(--text-faint)' }}>
+                    Repos conectados
+                  </div>
+                  <div
+                    style={{
+                      marginTop: '.15rem',
+                      fontFamily: 'var(--font-display)',
+                      fontWeight: 800,
+                      fontSize: '1.35rem',
+                    }}
+                  >
+                    {reposCount}
+                  </div>
+                  <div style={{ marginTop: '.15rem', fontSize: '.74rem', color: 'var(--text-muted)' }}>
+                    base para este perfil
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    background: 'var(--surface-2)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '10px',
+                    padding: '.75rem .9rem',
+                  }}
+                >
+                  <div style={{ fontSize: '.72rem', color: 'var(--text-faint)' }}>
+                    Skills detectadas
+                  </div>
+                  <div
+                    style={{
+                      marginTop: '.15rem',
+                      fontFamily: 'var(--font-display)',
+                      fontWeight: 800,
+                      fontSize: '1.35rem',
+                    }}
+                  >
+                    {distinctSkills}
+                  </div>
+                  <div style={{ marginTop: '.15rem', fontSize: '.74rem', color: 'var(--text-muted)' }}>
+                    lenguajes y stacks
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    background: 'var(--surface-2)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '10px',
+                    padding: '.75rem .9rem',
+                  }}
+                >
+                  <div style={{ fontSize: '.72rem', color: 'var(--text-faint)' }}>
+                    Commits totales
+                  </div>
+                  <div
+                    style={{
+                      marginTop: '.15rem',
+                      fontFamily: 'var(--font-display)',
+                      fontWeight: 800,
+                      fontSize: '1.35rem',
+                    }}
+                  >
+                    {totalCommits}
+                  </div>
+                  <div style={{ marginTop: '.15rem', fontSize: '.74rem', color: 'var(--text-muted)' }}>
+                    en repos priorizados
+                  </div>
+                </div>
+              </div>
+            </article>
+
+            {/* Skills principales */}
+            <article className="db-card">
+              <div className="db-card-hd">
+                <div className="db-card-title">Skills principales</div>
+              </div>
+
+              <div className="db-skills">
+                {skillsFromStats.map((s) => (
+                  <div className="db-skill" key={s.name}>
+                    <div className="db-skill-name">
+                      {s.name}
+                      <span
+                        style={{
+                          marginLeft: '.35rem',
+                          fontSize: '.7rem',
+                          color: 'var(--text-faint)',
+                        }}
+                      >
+                        · {s.level}
+                      </span>
+                    </div>
+
+                    <div className="db-skill-bg">
+                      <div
+                        className="db-skill-fill db-skill-fill--high"
+                        style={{ width: `${s.pct}%` }}
+                      />
+                    </div>
+
+                    <div className="db-skill-pct db-skill-pct--high">
+                      {Math.round(s.pct)}%
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </article>
+          </div>
+        </section>
       </main>
     </>
   )

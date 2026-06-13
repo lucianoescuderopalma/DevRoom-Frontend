@@ -1,6 +1,9 @@
-import { useState } from 'react'
+// src/pages/JobsPage.jsx
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import api from '../api/axios'
 
+// ICONOS
 const IcGrid = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <rect x="3" y="3" width="7" height="7" rx="1" />
@@ -92,80 +95,49 @@ const IcPin = () => (
   </svg>
 )
 
-const JOBS = [
-  {
-    co: 'F',
-    title: 'Backend Engineer · Java / Spring Boot',
-    company: 'Falabella Tech',
-    location: 'Remoto',
-    salary: '$4.000K–5.200K CLP',
-    match: '92%',
-    tone: 'high',
-    tags: ['Java', 'Spring', 'Microservices'],
-  },
-  {
-    co: 'B',
-    title: 'Full Stack Developer · React + Node',
-    company: 'Bci Digital',
-    location: 'Santiago',
-    salary: '$3.500K CLP',
-    match: '84%',
-    tone: 'high',
-    tags: ['React', 'Node', 'TypeScript'],
-  },
-  {
-    co: 'C',
-    title: 'Software Engineer · Microservices',
-    company: 'Cornershop',
-    location: 'Remoto LATAM',
-    salary: '$3.800K CLP',
-    match: '78%',
-    tone: 'mid',
-    tags: ['Java', 'APIs', 'Cloud'],
-  },
-  {
-    co: 'R',
-    title: 'Java Developer · Fintech',
-    company: 'Ripley Corp',
-    location: 'Santiago',
-    salary: '$3.200K CLP',
-    match: '71%',
-    tone: 'mid',
-    tags: ['Java', 'Spring Boot', 'SQL'],
-  },
-  {
-    co: 'M',
-    title: 'Backend Developer · Go',
-    company: 'Mercado Libre',
-    location: 'Híbrido',
-    salary: '$4.400K CLP',
-    match: '66%',
-    tone: 'low',
-    tags: ['Go', 'APIs', 'Docker'],
-  },
-]
-
-const PIPELINE = [
-  { label: 'Compatibles', value: 24, sub: 'match > 70%' },
-  { label: 'Postuladas', value: 6, sub: 'esta semana' },
-  { label: 'Entrevistas', value: 2, sub: 'activas' },
-]
-
-const ALERTS = [
-  'Java + Spring Boot sigue siendo tu combinación más fuerte.',
-  'React + TypeScript abre más opciones híbridas en Santiago.',
-  'Tienes 5 nuevas vacantes con match alto desde el último análisis.',
-]
-
-function badgeClass(tone) {
-  if (tone === 'high') return 'db-badge db-badge--high'
-  if (tone === 'mid') return 'db-badge db-badge--mid'
-  return 'db-badge db-badge--low'
-}
+const badgeClass = (active) =>
+  active ? 'db-badge db-badge--high' : 'db-badge db-badge--low'
 
 export default function JobsPage() {
   const navigate = useNavigate()
+
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [jobs, setJobs] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+
+  const [modality, setModality] = useState('all')
+  const [search, setSearch] = useState('')
+
+  const loadJobs = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      const params = {}
+      if (modality !== 'all') params.modality = modality
+      if (search.trim()) params.search = search.trim()
+
+      const res = await api.get('/api/jobs', { params })
+      setJobs(res.data || [])
+    } catch (e) {
+      console.error(e)
+      setError('No se pudieron cargar las ofertas de empleo.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadJobs()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const totalJobs = jobs.length
+  const activeJobs = jobs.filter((j) => j.isActive).length
+  const remoteJobs = jobs.filter(
+    (j) => j.modality && j.modality.toLowerCase().includes('remoto'),
+  ).length
 
   const NAV = [
     { icon: <IcGrid />, label: 'Dashboard', to: '/dashboard', active: false },
@@ -175,6 +147,10 @@ export default function JobsPage() {
     { icon: <IcUsers />, label: 'Red', to: '/red', active: false },
     { icon: <IcUser />, label: 'Perfil público', to: '/perfil', active: false },
   ]
+
+  const initials = 'LE'
+
+  const filteredJobs = jobs // ya filtramos por backend con params; si quisieras, aquí puedes filtrar más
 
   return (
     <div className="db-wrap">
@@ -200,7 +176,7 @@ export default function JobsPage() {
         </nav>
 
         <div className="db-side-profile">
-          <div className="db-side-av">LE</div>
+          <div className="db-side-av">{initials}</div>
           <div className="db-side-profile-txt">
             <div className="db-side-name">Luciano E.</div>
             <div className="db-side-handle">@lescudero · Santiago</div>
@@ -228,7 +204,7 @@ export default function JobsPage() {
               <span>Filtros</span>
             </button>
 
-            <button className="db-tbtn">
+            <button className="db-tbtn" onClick={loadJobs}>
               <IcSync />
               <span>Actualizar</span>
             </button>
@@ -238,7 +214,7 @@ export default function JobsPage() {
               <span className="db-notif-dot" />
             </div>
 
-            <div className="db-topbar-av">LE</div>
+            <div className="db-topbar-av">{initials}</div>
           </div>
         </header>
 
@@ -248,99 +224,237 @@ export default function JobsPage() {
             <div className="db-page-meta">
               <span>Vacantes alineadas con tu stack y actividad reciente</span>
               <span className="db-dot" />
-              <span className="db-meta-hi">24 oportunidades con match alto</span>
+              <span className="db-meta-hi">
+                {totalJobs} oportunidades activas
+              </span>
             </div>
           </div>
 
+          {loading && (
+            <div style={{ marginBottom: '1rem', fontSize: '.8rem', color: 'var(--text-muted)' }}>
+              Cargando ofertas…
+            </div>
+          )}
+          {error && (
+            <div style={{ marginBottom: '1rem', fontSize: '.8rem', color: 'var(--amber)' }}>
+              {error}
+            </div>
+          )}
+
+          {/* KPIs */}
           <div className="db-kpis">
             <div className="db-kpi">
               <div className="db-kpi-top">
-                <div className="db-kpi-ico db-kpi-ico--amber"><IcBag /></div>
-                <span className="db-kpi-trend">↑ +5 nuevas</span>
+                <div className="db-kpi-ico db-kpi-ico--amber">
+                  <IcBag />
+                </div>
+                <span className="db-kpi-trend">
+                  {totalJobs > 0 ? 'Nuevas hoy' : 'Sin datos'}
+                </span>
               </div>
-              <div className="db-kpi-val">24</div>
+              <div className="db-kpi-val">{totalJobs}</div>
               <div className="db-kpi-lbl">Empleos compatibles</div>
-              <div className="db-kpi-sub">match superior al 70%</div>
+              <div className="db-kpi-sub">según filtros actuales</div>
             </div>
 
             <div className="db-kpi">
               <div className="db-kpi-top">
-                <div className="db-kpi-ico db-kpi-ico--green"><IcStar /></div>
-                <span className="db-kpi-trend">Top 15%</span>
+                <div className="db-kpi-ico db-kpi-ico--green">
+                  <IcStar />
+                </div>
+                <span className="db-kpi-trend">Activos</span>
               </div>
-              <div className="db-kpi-val">87%</div>
-              <div className="db-kpi-lbl">Afinidad promedio</div>
-              <div className="db-kpi-sub">según tu perfil técnico</div>
+              <div className="db-kpi-val">{activeJobs}</div>
+              <div className="db-kpi-lbl">Ofertas activas</div>
+              <div className="db-kpi-sub">según backend (isActive)</div>
             </div>
 
             <div className="db-kpi">
               <div className="db-kpi-top">
-                <div className="db-kpi-ico db-kpi-ico--blue"><IcDoc /></div>
-                <span className="db-kpi-trend">↑ CV listo</span>
+                <div className="db-kpi-ico db-kpi-ico--blue">
+                  <IcDoc />
+                </div>
+                <span className="db-kpi-trend">Remoto</span>
               </div>
-              <div className="db-kpi-val">6</div>
-              <div className="db-kpi-lbl">Postulaciones hechas</div>
-              <div className="db-kpi-sub">durante esta semana</div>
+              <div className="db-kpi-val">{remoteJobs}</div>
+              <div className="db-kpi-lbl">Vacantes remotas</div>
+              <div className="db-kpi-sub">con modalidad tipo remoto</div>
             </div>
 
             <div className="db-kpi">
               <div className="db-kpi-top">
-                <div className="db-kpi-ico db-kpi-ico--amber"><IcUsers /></div>
-                <span className="db-kpi-trend">↑ +3 puentes</span>
+                <div className="db-kpi-ico db-kpi-ico--amber">
+                  <IcUsers />
+                </div>
+                <span className="db-kpi-trend">Postulaciones</span>
               </div>
-              <div className="db-kpi-val">9</div>
-              <div className="db-kpi-lbl">Conexiones útiles</div>
-              <div className="db-kpi-sub">dentro de tu red profesional</div>
+              <div className="db-kpi-val">0</div>
+              <div className="db-kpi-lbl">Integración futura</div>
+              <div className="db-kpi-sub">flujo de aplicar aún pendiente</div>
             </div>
           </div>
 
           <div className="db-grid">
             <div className="db-col">
+              {/* Filtros */}
+              <div className="db-card">
+                <div className="db-card-hd">
+                  <div className="db-card-title">
+                    <IcFilter /> Filtros
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1.2fr)',
+                    gap: '.75rem',
+                  }}
+                >
+                  <input
+                    type="text"
+                    placeholder="Buscar por título o empresa..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') loadJobs()
+                    }}
+                    style={{
+                      padding: '.55rem .7rem',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border)',
+                      background: 'var(--surface-2)',
+                      color: 'var(--text)',
+                      fontSize: '.8rem',
+                    }}
+                  />
+
+                  <select
+                    value={modality}
+                    onChange={(e) => setModality(e.target.value)}
+                    style={{
+                      padding: '.55rem .7rem',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border)',
+                      background: 'var(--surface-2)',
+                      color: 'var(--text)',
+                      fontSize: '.8rem',
+                    }}
+                  >
+                    <option value="all">Todas las modalidades</option>
+                    <option value="Remoto">Remoto</option>
+                    <option value="Híbrido">Híbrido</option>
+                    <option value="Presencial">Presencial</option>
+                  </select>
+                </div>
+
+                <div style={{ marginTop: '.75rem', textAlign: 'right' }}>
+                  <button
+                    className="db-tbtn"
+                    type="button"
+                    onClick={loadJobs}
+                    style={{ fontSize: '.78rem', paddingInline: '.9rem' }}
+                  >
+                    <IcSync />
+                    <span>Aplicar filtros</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Lista de empleos */}
               <div className="db-card">
                 <div className="db-card-hd">
                   <div className="db-card-title">
                     <IcBag /> Vacantes destacadas
                   </div>
-                  <button className="db-card-link">
-                    Ver todas <IcChevR />
-                  </button>
+                  <span className="db-pill db-pill--blue">
+                    {filteredJobs.length} mostradas
+                  </span>
                 </div>
 
                 <div className="db-jobs">
-                  {JOBS.map((job) => (
-                    <div key={job.title} className="db-job">
-                      <div className="db-job-logo">{job.co}</div>
+                  {filteredJobs.map((job) => (
+                    <div key={job.id} className="db-job">
+                      <div className="db-job-logo">
+                        {(job.companyName || 'C')[0]}
+                      </div>
 
                       <div className="db-job-info">
                         <div className="db-job-title">{job.title}</div>
                         <div className="db-job-meta">
-                          <span>{job.company}</span>
-                          <span className="db-dot" />
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem' }}>
-                            <IcPin />
-                            {job.location}
-                          </span>
-                          <span className="db-dot" />
-                          <span className="db-job-salary">{job.salary}</span>
+                          <span>{job.companyName || 'Empresa confidencial'}</span>
+                          {job.location && (
+                            <>
+                              <span className="db-dot" />
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem' }}>
+                                <IcPin /> {job.location}
+                              </span>
+                            </>
+                          )}
+                          {job.modality && (
+                            <>
+                              <span className="db-dot" />
+                              <span>{job.modality}</span>
+                            </>
+                          )}
                         </div>
-
-                        <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap', marginTop: '.55rem' }}>
-                          {job.tags.map((tag) => (
-                            <span key={tag} className="db-pill db-pill--blue">{tag}</span>
-                          ))}
-                        </div>
+                        {job.salaryRange && (
+                          <div
+                            style={{
+                              marginTop: '.3rem',
+                              fontSize: '.76rem',
+                              color: 'var(--text-muted)',
+                            }}
+                          >
+                            {job.salaryRange}
+                          </div>
+                        )}
                       </div>
 
                       <div className="db-job-r">
-                        <span className={badgeClass(job.tone)}>{job.match}</span>
-                        <button className="db-job-btn">Postular</button>
+                        <span className={badgeClass(job.isActive)}>
+                          {job.isActive ? 'Activa' : 'Cerrada'}
+                        </span>
+                        {typeof job.applicantsCount === 'number' && (
+                          <div
+                            style={{
+                              marginTop: '.25rem',
+                              fontSize: '.7rem',
+                              color: 'var(--text-muted)',
+                              textAlign: 'right',
+                            }}
+                          >
+                            {job.applicantsCount} postulantes
+                          </div>
+                        )}
+                        <button
+                          className="db-job-btn"
+                          type="button"
+                          disabled={!job.isActive}
+                        >
+                          Postular
+                        </button>
                       </div>
                     </div>
                   ))}
+
+                  {!loading && !filteredJobs.length && (
+                    <div
+                      style={{
+                        padding: '1.5rem 1rem',
+                        fontSize: '.8rem',
+                        color: 'var(--text-muted)',
+                        textAlign: 'center',
+                      }}
+                    >
+                      No se encontraron ofertas con esos filtros.
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
 
+            {/* Columna derecha con pipeline simple + insights */}
             <div className="db-col">
               <div className="db-card">
                 <div className="db-card-hd">
@@ -350,62 +464,73 @@ export default function JobsPage() {
                 </div>
 
                 <div style={{ display: 'grid', gap: '.75rem' }}>
-                  {PIPELINE.map((item) => (
+                  <div
+                    style={{
+                      background: 'var(--surface-2)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '10px',
+                      padding: '1rem 1rem .9rem',
+                    }}
+                  >
                     <div
-                      key={item.label}
                       style={{
-                        background: 'var(--surface-2)',
-                        border: '1px solid var(--border)',
-                        borderRadius: '10px',
-                        padding: '1rem 1rem .9rem',
+                        fontSize: '.72rem',
+                        color: 'var(--text-faint)',
+                        marginBottom: '.25rem',
                       }}
                     >
-                      <div style={{ fontSize: '.72rem', color: 'var(--text-faint)', marginBottom: '.25rem' }}>
-                        {item.label}
-                      </div>
-                      <div
-                        style={{
-                          fontFamily: 'var(--font-display)',
-                          fontSize: '1.65rem',
-                          fontWeight: 800,
-                          lineHeight: 1,
-                          letterSpacing: '-.03em',
-                        }}
-                      >
-                        {item.value}
-                      </div>
-                      <div style={{ marginTop: '.35rem', fontSize: '.74rem', color: 'var(--text-muted)' }}>
-                        {item.sub}
-                      </div>
+                      Compatibles
                     </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="db-card">
-                <div className="db-card-hd">
-                  <div className="db-card-title">
-                    <IcStar /> Insights
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
-                  {ALERTS.map((alert) => (
                     <div
-                      key={alert}
                       style={{
-                        padding: '.9rem 1rem',
-                        background: 'var(--surface-2)',
-                        border: '1px solid var(--border)',
-                        borderRadius: '10px',
+                        fontFamily: 'var(--font-display)',
+                        fontSize: '1.65rem',
+                        fontWeight: 800,
+                        lineHeight: 1,
+                        letterSpacing: '-.03em',
+                      }}
+                    >
+                      {totalJobs}
+                    </div>
+                    <div
+                      style={{
+                        marginTop: '.35rem',
+                        fontSize: '.74rem',
+                        color: 'var(--text-muted)',
+                      }}
+                    >
+                      Vacantes visibles con tu stack actual.
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      background: 'var(--surface-2)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '10px',
+                      padding: '1rem 1rem .9rem',
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: '.72rem',
+                        color: 'var(--text-faint)',
+                        marginBottom: '.25rem',
+                      }}
+                    >
+                      Insights
+                    </div>
+                    <div
+                      style={{
                         fontSize: '.8rem',
                         color: 'var(--text-muted)',
                         lineHeight: 1.6,
                       }}
                     >
-                      {alert}
+                      A medida que conectemos tu CV y match real,
+                      aquí verás métricas de postulaciones y entrevistas.
                     </div>
-                  ))}
+                  </div>
                 </div>
               </div>
 
@@ -417,22 +542,26 @@ export default function JobsPage() {
                 </div>
 
                 <div style={{ display: 'grid', gap: '.75rem' }}>
-                  <button className="db-tbtn db-tbtn--primary" style={{ width: '100%', justifyContent: 'center' }}>
-                    Exportar CV
+                  <button
+                    className="db-tbtn db-tbtn--primary"
+                    style={{ width: '100%', justifyContent: 'center' }}
+                    onClick={() => navigate('/cv')}
+                  >
+                    Exportar CV para aplicar
                   </button>
                   <button
                     className="db-tbtn"
                     style={{ width: '100%', justifyContent: 'center' }}
-                    onClick={() => navigate('/red')}
+                    onClick={() => navigate('/perfil')}
                   >
-                    Ver red relacionada
+                    Ver perfil público
                   </button>
                   <button
                     className="db-tbtn"
                     style={{ width: '100%', justifyContent: 'center' }}
                     onClick={() => navigate('/dashboard')}
                   >
-                    Ir al dashboard
+                    Volver al dashboard
                   </button>
                 </div>
               </div>

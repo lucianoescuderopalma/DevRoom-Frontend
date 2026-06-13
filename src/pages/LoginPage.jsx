@@ -1,11 +1,11 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import { useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore.js'
 
 
 const GITHUB_CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID
-const REDIRECT_URI = import.meta.env.VITE_GITHUB_REDIRECT_URI || 'http://localhost:8080/auth/callback'
+const REDIRECT_URI = import.meta.env.VITE_GITHUB_REDIRECT_URI || 'http://localhost:5173/auth/callback'
 
 function generateState() {
   return Math.random().toString(36).substring(2, 15)
@@ -168,6 +168,13 @@ export default function LoginPage() {
         <p style={{ fontSize:'0.72rem', color:'var(--text-faint)', marginTop:'1.5rem' }}>
           DevRoom · Hecho para devs de Chile y LATAM
         </p>
+         <Link
+          to="/"
+          className="btn-ghost"
+          style={{ marginTop: '0.75rem' }}
+        >
+          ← Volver al inicio
+        </Link>
       </div>
     </div>
   )

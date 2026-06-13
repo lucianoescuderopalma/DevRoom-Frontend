@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import api from '../api/axios'
 
 const IcGrid = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -93,6 +94,13 @@ const IcCheck = () => (
   </svg>
 )
 
+const IcActivity = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+  </svg>
+)
+
+// MOCKS como fallback visual
 const STRENGTHS = [
   { name: 'Experiencia técnica', detail: 'Java, Spring Boot, React, TypeScript y APIs.', status: 'ok' },
   { name: 'Stack visible', detail: 'Repositorios y skills detectadas correctamente.', status: 'ok' },
@@ -114,18 +122,100 @@ const SUGGESTIONS = [
   'Incluir métricas o resultados concretos en experiencia reciente.',
 ]
 
+const CV_CHECKS = [
+  { st: 'ok', txt: '12 repositorios conectados' },
+  { st: 'ok', txt: 'Skills extraídas por IA' },
+  { st: 'ok', txt: 'Perfil público activo' },
+  { st: 'warn', txt: 'Descripción personal' },
+  { st: 'pending', txt: 'Proyectos destacados' },
+]
+
+const SKILLS = [
+  { name: 'Java', pct: 92 },
+  { name: 'Spring Boot', pct: 88 },
+  { name: 'React', pct: 80 },
+  { name: 'TypeScript', pct: 74 },
+  { name: 'PostgreSQL', pct: 70 },
+  { name: 'Docker', pct: 60 },
+]
+
+const ACTIVITY = [30, 70, 50, 90, 60, 40, 20]
+const DAYS = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
+
 function pillClass(tone) {
   if (tone === 'green') return 'db-pill db-pill--green'
   if (tone === 'blue') return 'db-pill db-pill--blue'
   return 'db-pill db-pill--amber'
 }
 
+function skillLevelFromPct(pct) {
+  if (pct >= 80) return 'high'
+  if (pct >= 60) return 'mid'
+  return 'low'
+}
+
 export default function CvPage() {
   const navigate = useNavigate()
   const [mobileOpen, setMobileOpen] = useState(false)
 
+  const [cv, setCv] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    const fetchCv = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const res = await api.get('/api/cv/me')
+        setCv(res.data || null)
+      } catch (err) {
+        console.error(err)
+        setError('No se pudo cargar tu CV, mostrando versión estimada.')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchCv()
+  }, [])
+
+  const score = typeof cv?.score === 'number' ? cv.score : 87
   const circ = 2 * Math.PI * 50
-  const offset = circ - 0.87 * circ
+  const offset = circ - (score / 100) * circ
+
+  const summaryText =
+    cv?.summary ||
+    'Desarrollador backend / full stack con experiencia en Java, Spring Boot y React, enfocado en construir APIs limpias y productos escalables.'
+
+  const fullName = cv?.fullName || 'Luciano E.'
+  const headline = cv?.headline || 'Backend / Full Stack Developer'
+  const location = cv?.location || 'Santiago'
+
+  // Skills desde backend (cv.skills) → fallback a SKILLS mock
+  const skillsToShow = cv?.skills?.length
+    ? cv.skills.map((s) => {
+        let pct
+        if (s.level === 'Avanzado') pct = 92
+        else if (s.level === 'Intermedio') pct = 74
+        else pct = 60
+        return { name: s.name, pct }
+      })
+    : SKILLS
+
+  // Checks derivados del CV si hay datos, sino mocks
+  const cvChecksFromCv =
+    cv && (cv.skills?.length || cv.projects?.length)
+      ? [
+          cv.projects?.length
+            ? { st: 'ok', txt: `${cv.projects.length} proyectos destacados` }
+            : null,
+          cv.skills?.length
+            ? { st: 'ok', txt: `${cv.skills.length} skills detectadas` }
+            : null,
+          { st: cv.isPublic ? 'ok' : 'warn', txt: cv.isPublic ? 'CV público activo' : 'CV aún no público' },
+        ].filter(Boolean)
+      : CV_CHECKS
 
   const NAV = [
     { icon: <IcGrid />, label: 'Dashboard', to: '/dashboard', active: false },
@@ -135,6 +225,27 @@ export default function CvPage() {
     { icon: <IcUsers />, label: 'Red', to: '/red', active: false },
     { icon: <IcUser />, label: 'Perfil público', to: '/perfil', active: false },
   ]
+
+  const handleExport = async () => {
+  try {
+    const res = await api.get('/api/cv/export', {
+      responseType: 'blob',
+    })
+
+    const blob = new Blob([res.data], { type: 'application/pdf' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'cv-devroom.pdf'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    window.URL.revokeObjectURL(url)
+  } catch (e) {
+    console.error(e)
+    alert('No se pudo exportar el CV en PDF. Inténtalo de nuevo en unos minutos.')
+  }
+}
 
   return (
     <div className="db-wrap">
@@ -160,10 +271,10 @@ export default function CvPage() {
         </nav>
 
         <div className="db-side-profile">
-          <div className="db-side-av">LE</div>
+          <div className="db-side-av">{fullName.slice(0, 2).toUpperCase()}</div>
           <div className="db-side-profile-txt">
-            <div className="db-side-name">Luciano E.</div>
-            <div className="db-side-handle">@lescudero · Santiago</div>
+            <div className="db-side-name">{fullName}</div>
+            <div className="db-side-handle">@lescudero · {location}</div>
           </div>
         </div>
       </aside>
@@ -183,12 +294,12 @@ export default function CvPage() {
           </div>
 
           <div className="db-topbar-r">
-            <button className="db-tbtn">
+            <button className="db-tbtn" onClick={() => window.location.reload()}>
               <IcSync />
               <span>Sincronizar</span>
             </button>
 
-            <button className="db-tbtn db-tbtn--primary">
+            <button className="db-tbtn db-tbtn--primary" onClick={handleExport}>
               <IcDown />
               <span>Exportar CV</span>
             </button>
@@ -198,7 +309,7 @@ export default function CvPage() {
               <span className="db-notif-dot" />
             </div>
 
-            <div className="db-topbar-av">LE</div>
+            <div className="db-topbar-av">{fullName.slice(0, 2).toUpperCase()}</div>
           </div>
         </header>
 
@@ -208,47 +319,84 @@ export default function CvPage() {
             <div className="db-page-meta">
               <span>Currículum generado con IA a partir de tu perfil técnico</span>
               <span className="db-dot" />
-              <span className="db-meta-hi">87 / 100 de completitud</span>
+              <span className="db-meta-hi">{score} / 100 de completitud</span>
             </div>
           </div>
+
+          {headline && (
+            <div
+              style={{
+                marginBottom: '0.8rem',
+                fontSize: '.9rem',
+                color: 'var(--text-muted)',
+              }}
+            >
+              {headline}
+            </div>
+          )}
+
+          {loading && (
+            <div style={{ marginBottom: '1rem', fontSize: '.8rem', color: 'var(--text-muted)' }}>
+              Analizando tu perfil y generando CV…
+            </div>
+          )}
+          {error && (
+            <div style={{ marginBottom: '1rem', fontSize: '.8rem', color: 'var(--amber)' }}>
+              {error}
+            </div>
+          )}
 
           <div className="db-kpis">
             <div className="db-kpi">
               <div className="db-kpi-top">
-                <div className="db-kpi-ico db-kpi-ico--amber"><IcDoc /></div>
-                <span className="db-kpi-trend">↑ 87%</span>
+                <div className="db-kpi-ico db-kpi-ico--amber">
+                  <IcDoc />
+                </div>
+                <span className="db-kpi-trend">{score}%</span>
               </div>
               <div className="db-kpi-val">CV</div>
               <div className="db-kpi-lbl">Generado por IA</div>
-              <div className="db-kpi-sub">listo para exportar</div>
+              <div className="db-kpi-sub">
+                {cv?.isOnline ? 'versión online activa' : 'listo para exportar'}
+              </div>
             </div>
 
             <div className="db-kpi">
               <div className="db-kpi-top">
-                <div className="db-kpi-ico db-kpi-ico--green"><IcStar /></div>
-                <span className="db-kpi-trend">Top 15%</span>
+                <div className="db-kpi-ico db-kpi-ico--green">
+                  <IcStar />
+                </div>
+                <span className="db-kpi-trend">Skills</span>
               </div>
-              <div className="db-kpi-val">87</div>
-              <div className="db-kpi-lbl">Score actual</div>
-              <div className="db-kpi-sub">según stack y experiencia</div>
+              <div className="db-kpi-val">{skillsToShow.length}</div>
+              <div className="db-kpi-lbl">Skills detectadas</div>
+              <div className="db-kpi-sub">
+                {skillsToShow.slice(0, 3).map((s) => s.name).join(' · ') || 'Conecta repos para detectar stack'}
+              </div>
             </div>
 
             <div className="db-kpi">
               <div className="db-kpi-top">
-                <div className="db-kpi-ico db-kpi-ico--blue"><IcGithub /></div>
-                <span className="db-kpi-trend">↑ +2</span>
+                <div className="db-kpi-ico db-kpi-ico--blue">
+                  <IcGithub />
+                </div>
+                <span className="db-kpi-trend">
+                  {cv?.projects?.length ? `+${cv.projects.length}` : '+2'}
+                </span>
               </div>
-              <div className="db-kpi-val">12</div>
-              <div className="db-kpi-lbl">Repositorios base</div>
+              <div className="db-kpi-val">{cv?.projects?.length ?? 2}</div>
+              <div className="db-kpi-lbl">Proyectos base</div>
               <div className="db-kpi-sub">usados para enriquecer contenido</div>
             </div>
 
             <div className="db-kpi">
               <div className="db-kpi-top">
-                <div className="db-kpi-ico db-kpi-ico--amber"><IcUsers /></div>
-                <span className="db-kpi-trend">↑ mejorable</span>
+                <div className="db-kpi-ico db-kpi-ico--amber">
+                  <IcUsers />
+                </div>
+                <span className="db-kpi-trend">mejorable</span>
               </div>
-              <div className="db-kpi-val">3</div>
+              <div className="db-kpi-val">{STRENGTHS.filter((s) => s.status !== 'ok').length}</div>
               <div className="db-kpi-lbl">Áreas a reforzar</div>
               <div className="db-kpi-sub">antes de exportar versión final</div>
             </div>
@@ -256,30 +404,29 @@ export default function CvPage() {
 
           <div className="db-grid">
             <div className="db-col">
+              {/* Estructura del CV */}
               <div className="db-card">
                 <div className="db-card-hd">
                   <div className="db-card-title">
                     <IcDoc /> Estructura del CV
                   </div>
-                  <button className="db-card-link">
+                  <button className="db-card-link" type="button">
                     Editar <IcChevR />
                   </button>
                 </div>
 
                 <div className="db-jobs">
                   {SECTIONS.map((section) => (
-                    <div key={section.title} className="db-job">
+                    <div className="db-job" key={section.title}>
                       <div className="db-job-logo">
                         <IcCheck />
                       </div>
-
                       <div className="db-job-info">
                         <div className="db-job-title">{section.title}</div>
                         <div className="db-job-meta">
                           <span>Estado actual del bloque</span>
                         </div>
                       </div>
-
                       <div className="db-job-r">
                         <span className={pillClass(section.tone)}>{section.state}</span>
                       </div>
@@ -288,6 +435,7 @@ export default function CvPage() {
                 </div>
               </div>
 
+              {/* Recomendaciones de mejora */}
               <div className="db-card">
                 <div className="db-card-hd">
                   <div className="db-card-title">
@@ -317,17 +465,32 @@ export default function CvPage() {
             </div>
 
             <div className="db-col">
+              {/* Score y resumen */}
               <div className="db-card db-card--center">
                 <div className="db-card-hd db-card-hd--full">
                   <div className="db-card-title">
                     <IcDoc /> Score del CV
                   </div>
-                  <span className="db-pill db-pill--green">87 / 100</span>
+                  <span className="db-pill db-pill--green">{score} / 100</span>
                 </div>
 
                 <div className="db-ring">
-                  <svg width="110" height="110" viewBox="0 0 120 120">
-                    <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(255,255,255,.06)" strokeWidth="10" />
+                  <svg width="126" height="126" viewBox="0 0 120 120">
+                    <defs>
+                      <linearGradient id="cvgrad" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0" stopColor="#f59e0b" />
+                        <stop offset="1" stopColor="#10b981" />
+                      </linearGradient>
+                    </defs>
+
+                    <circle
+                      cx="60"
+                      cy="60"
+                      r="50"
+                      fill="none"
+                      stroke="rgba(255,255,255,.06)"
+                      strokeWidth="10"
+                    />
                     <circle
                       cx="60"
                       cy="60"
@@ -340,69 +503,146 @@ export default function CvPage() {
                       strokeDashoffset={offset}
                       transform="rotate(-90 60 60)"
                     />
-                    <defs>
-                      <linearGradient id="cvgrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stopColor="#f59e0b" />
-                        <stop offset="100%" stopColor="#10b981" />
-                      </linearGradient>
-                    </defs>
-                    <text x="60" y="55" textAnchor="middle" fontFamily="Sora, sans-serif" fontSize="22" fontWeight="800" fill="#e2e8f0">
-                      87
+                    <text
+                      x="60"
+                      y="56"
+                      textAnchor="middle"
+                      fontFamily="Sora, sans-serif"
+                      fontSize="22"
+                      fontWeight="800"
+                      fill="#e2e8f0"
+                    >
+                      {score}
                     </text>
-                    <text x="60" y="70" textAnchor="middle" fontFamily="Space Grotesk, sans-serif" fontSize="8" fill="#7c8db5">
-                      SCORE
+                    <text
+                      x="60"
+                      y="72"
+                      textAnchor="middle"
+                      fontFamily="Space Grotesk, sans-serif"
+                      fontSize="8"
+                      fill="#7c8db5"
+                    >
+                      COMPLETITUD
                     </text>
                   </svg>
                 </div>
 
+                <p className="db-cv-summary">
+                  {summaryText}
+                </p>
+
                 <div className="db-cv-checks">
-                  {STRENGTHS.map((item) => (
-                    <div key={item.name} className="db-cv-check">
+                  {cvChecksFromCv.map((item) => (
+                    <div
+                      className={`db-cv-check${item.st === 'pending' ? ' db-cv-pending' : ''}`}
+                      key={item.txt}
+                    >
                       <span
-                        className={`db-cv-dot ${
-                          item.status === 'ok'
-                            ? 'db-cv-dot--ok'
-                            : item.status === 'warn'
-                            ? 'db-cv-dot--warn'
-                            : ''
-                        }`}
+                        className={
+                          'db-cv-dot' +
+                          (item.st === 'ok'
+                            ? ' db-cv-dot--ok'
+                            : item.st === 'warn'
+                            ? ' db-cv-dot--warn'
+                            : '')
+                        }
                       />
-                      <div>
-                        <div style={{ fontSize: '.8rem', fontWeight: 700, color: 'var(--text)' }}>{item.name}</div>
-                        <div style={{ fontSize: '.74rem', color: 'var(--text-muted)', marginTop: '.2rem' }}>
-                          {item.detail}
-                        </div>
-                      </div>
+                      <span>{item.txt}</span>
                     </div>
                   ))}
                 </div>
               </div>
 
+              {/* Top skills */}
               <div className="db-card">
                 <div className="db-card-hd">
                   <div className="db-card-title">
-                    <IcDown /> Acciones rápidas
+                    <IcStar /> Top skills
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gap: '.75rem' }}>
-                  <button className="db-tbtn db-tbtn--primary" style={{ width: '100%', justifyContent: 'center' }}>
-                    Exportar PDF
-                  </button>
-                  <button
-                    className="db-tbtn"
-                    style={{ width: '100%', justifyContent: 'center' }}
-                    onClick={() => navigate('/perfil')}
-                  >
-                    Ver perfil público
-                  </button>
-                  <button
-                    className="db-tbtn"
-                    style={{ width: '100%', justifyContent: 'center' }}
-                    onClick={() => navigate('/empleos')}
-                  >
-                    Ver empleos compatibles
-                  </button>
+                <div className="db-skills">
+                  {skillsToShow.map((s) => {
+                    const lvl = skillLevelFromPct(s.pct)
+                    return (
+                      <div className="db-skill" key={s.name}>
+                        <span className="db-skill-name">{s.name}</span>
+                        <div className="db-skill-bg">
+                          <div
+                            className={`db-skill-fill db-skill-fill--${lvl}`}
+                            style={{ width: `${s.pct}%` }}
+                          />
+                        </div>
+                        <span className={`db-skill-pct db-skill-pct--${lvl}`}>
+                          {Math.round(s.pct)}%
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Actividad semanal (placeholder visual) */}
+              <div className="db-card">
+                <div className="db-card-hd">
+                  <div className="db-card-title">
+                    <IcActivity /> Actividad semanal
+                  </div>
+                  <span className="db-pill db-pill--amber">
+                    47 commits
+                  </span>
+                </div>
+
+                <div className="db-activity">
+                  {ACTIVITY.map((v, i) => (
+                    <div className="db-act-col" key={DAYS[i]}>
+                      <div className="db-act-bar-wrap">
+                        <div className="db-act-bar" style={{ height: `${v}%` }} />
+                      </div>
+                      <div className="db-act-day">{DAYS[i]}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Resumen lateral */}
+              <div className="db-card">
+                <div className="db-card-hd">
+                  <div className="db-card-title">
+                    <IcUsers /> Resumen
+                  </div>
+                </div>
+
+                <div className="db-jobs">
+                  <div className="db-job">
+                    <div className="db-job-logo">#</div>
+                    <div className="db-job-info">
+                      <div className="db-job-title">Ranking del perfil</div>
+                      <div className="db-job-meta">
+                        <span>Top 15%</span>
+                        <span className="db-dot" />
+                        <span>stack Java</span>
+                      </div>
+                    </div>
+                    <div className="db-job-r">
+                      <span className="db-pill db-pill--amber">TOP</span>
+                    </div>
+                  </div>
+
+                  <div className="db-job">
+                    <div className="db-job-logo">AI</div>
+                    <div className="db-job-info">
+                      <div className="db-job-title">Actividad detectada</div>
+                      <div className="db-job-meta">
+                        <span>{cv?.projects?.length ?? 2} proyectos</span>
+                        <span className="db-dot" />
+                        <span>{skillsToShow.length} skills</span>
+                      </div>
+                    </div>
+                    <div className="db-job-r">
+                      <span className="db-pill db-pill--green">Activo</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

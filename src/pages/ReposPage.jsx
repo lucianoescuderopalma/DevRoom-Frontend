@@ -1,6 +1,9 @@
-import { useState } from 'react'
+// src/pages/ReposPage.jsx
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import api from '../api/axios'
 
+// ICONOS
 const IcGrid = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <rect x="3" y="3" width="7" height="7" rx="1" />
@@ -94,58 +97,106 @@ const IcCode = () => (
   </svg>
 )
 
-const IcActivity = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-  </svg>
-)
-
-const REPOS = [
-  { name: 'devroom-backend', lang: 'Java', dot: '#f59e0b', commits: 142, score: 92, level: 'high', updated: 'hace 2 días' },
-  { name: 'portfolio-react', lang: 'TypeScript', dot: '#38bdf8', commits: 87, score: 88, level: 'high', updated: 'hace 5 días' },
-  { name: 'ml-classifier', lang: 'Python', dot: '#10b981', commits: 63, score: 74, level: 'mid', updated: 'hace 2 sem' },
-  { name: 'devroom-frontend', lang: 'React/JSX', dot: '#38bdf8', commits: 210, score: 90, level: 'high', updated: 'hace 1 día' },
-  { name: 'fiber-api', lang: 'Go', dot: '#a78bfa', commits: 31, score: 58, level: 'low', updated: 'hace 1 mes' },
-  { name: 'infra-scripts', lang: 'Shell', dot: '#94a3b8', commits: 28, score: 61, level: 'low', updated: 'hace 3 sem' },
-]
-
-const TOP_LANGS = [
-  { name: 'Java', pct: 34, level: 'high' },
-  { name: 'React/JSX', pct: 26, level: 'mid' },
-  { name: 'TypeScript', pct: 18, level: 'mid' },
-  { name: 'Python', pct: 14, level: 'mid' },
-  { name: 'Go', pct: 8, level: 'low' },
-]
-
-const INSIGHTS = [
-  'Tus repositorios con mejor score combinan backend Java y frontend React.',
-  'Los proyectos con más commits son los que más empujan tu perfil técnico.',
-  'Conviene destacar 3 repositorios principales con README y stack claro.',
-]
-
-function badgeClass(level) {
-  if (level === 'high') return 'db-badge db-badge--high'
-  if (level === 'mid') return 'db-badge db-badge--mid'
-  return 'db-badge db-badge--low'
-}
-
-function fillClass(level) {
-  if (level === 'high') return 'db-skill-fill db-skill-fill--high'
-  if (level === 'mid') return 'db-skill-fill db-skill-fill--mid'
-  return 'db-skill-fill db-skill-fill--low'
-}
-
-function pctClass(level) {
-  if (level === 'high') return 'db-skill-pct db-skill-pct--high'
-  if (level === 'mid') return 'db-skill-pct db-skill-pct--mid'
-  return 'db-skill-pct db-skill-pct--low'
+// HELPERS UI
+const pillClass = (tone) => {
+  if (tone === 'green') return 'db-pill db-pill--green'
+  if (tone === 'amber') return 'db-pill db-pill--amber'
+  return 'db-pill db-pill--blue'
 }
 
 export default function ReposPage() {
   const navigate = useNavigate()
-  const [mobileOpen, setMobileOpen] = useState(false)
 
-  const NAV = [
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const [me, setMe] = useState(null)
+  const [repos, setRepos] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+
+  const [syncing, setSyncing] = useState(false)
+  const [syncMsg, setSyncMsg] = useState(null)
+
+  const [search, setSearch] = useState('')
+  const [languageFilter, setLanguageFilter] = useState('all')
+  const [visibilityFilter, setVisibilityFilter] = useState('all')
+
+  const load = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      const meRes = await api.get('/api/auth/me')
+      const profile = meRes.data
+      setMe(profile)
+
+      const reposRes = await api.get(`/api/users/${profile.username}/repos`)
+      setRepos(reposRes.data || [])
+    } catch (err) {
+      console.error(err)
+      setError('No se pudieron cargar tus repositorios.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    load()
+  }, [])
+
+  const handleSync = async () => {
+    try {
+      setSyncing(true)
+      setSyncMsg(null)
+      const res = await api.post('/api/repos/sync')
+      setSyncMsg(`✓ ${res.data.count ?? 0} repos sincronizados desde GitHub`)
+      await load()
+    } catch (e) {
+      console.error(e)
+      setSyncMsg('Error al sincronizar con GitHub')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  const languages = useMemo(() => {
+    const set = new Set()
+    repos.forEach((r) => {
+      if (r.mainLanguage) set.add(r.mainLanguage)
+    })
+    return Array.from(set).sort()
+  }, [repos])
+
+  const publicCount = repos.filter((r) => !r.isPrivate).length
+  const privateCount = repos.filter((r) => r.isPrivate).length
+
+  const filteredRepos = useMemo(() => {
+    let list = [...repos]
+
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      list = list.filter(
+        (r) =>
+          r.name?.toLowerCase().includes(q) ||
+          r.description?.toLowerCase().includes(q)
+      )
+    }
+
+    if (languageFilter !== 'all') {
+      list = list.filter((r) => r.mainLanguage === languageFilter)
+    }
+
+    if (visibilityFilter === 'public') {
+      list = list.filter((r) => !r.isPrivate)
+    } else if (visibilityFilter === 'private') {
+      list = list.filter((r) => r.isPrivate)
+    }
+
+    list.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+
+    return list
+  }, [repos, search, languageFilter, visibilityFilter])
+
+  const navItems = [
     { icon: <IcGrid />, label: 'Dashboard', to: '/dashboard', active: false },
     { icon: <IcGithub />, label: 'Repositorios', to: '/repositorios', active: true },
     { icon: <IcDoc />, label: 'Mi CV', to: '/cv', active: false },
@@ -153,6 +204,8 @@ export default function ReposPage() {
     { icon: <IcUsers />, label: 'Red', to: '/red', active: false },
     { icon: <IcUser />, label: 'Perfil público', to: '/perfil', active: false },
   ]
+
+  const initials = (me?.name || me?.username || 'LE').slice(0, 2).toUpperCase()
 
   return (
     <div className="db-wrap">
@@ -165,14 +218,11 @@ export default function ReposPage() {
         </div>
 
         <nav className="db-nav">
-          {NAV.map((item) => (
+          {navItems.map((item) => (
             <button
               key={item.label}
               className={`db-nav-item ${item.active ? 'db-nav-item--on' : ''}`}
-              onClick={() => {
-                setMobileOpen(false)
-                if (item.to) navigate(item.to)
-              }}
+              onClick={() => item.to && navigate(item.to)}
             >
               <span className="db-nav-ico">{item.icon}</span>
               <span className="db-nav-lbl">{item.label}</span>
@@ -181,10 +231,12 @@ export default function ReposPage() {
         </nav>
 
         <div className="db-side-profile">
-          <div className="db-side-av">LE</div>
+          <div className="db-side-av">{initials}</div>
           <div className="db-side-profile-txt">
-            <div className="db-side-name">Luciano E.</div>
-            <div className="db-side-handle">@lescudero · Santiago</div>
+            <div className="db-side-name">{me?.name || 'Luciano E.'}</div>
+            <div className="db-side-handle">
+              @{me?.username || 'lescudero'} · {me?.location || 'Santiago'}
+            </div>
           </div>
         </div>
       </aside>
@@ -204,14 +256,14 @@ export default function ReposPage() {
           </div>
 
           <div className="db-topbar-r">
-            <button className="db-tbtn">
+            <button className="db-tbtn" onClick={handleSync} disabled={syncing}>
               <IcSync />
-              <span>Sincronizar</span>
+              <span>{syncing ? 'Sincronizando…' : 'Sincronizar con GitHub'}</span>
             </button>
 
-            <button className="db-tbtn db-tbtn--primary">
-              <IcDown />
-              <span>Exportar</span>
+            <button className="db-tbtn db-tbtn--primary" onClick={() => navigate('/dashboard')}>
+              <IcGrid />
+              <span>Volver al dashboard</span>
             </button>
 
             <div className="db-tbtn-ico">
@@ -219,73 +271,152 @@ export default function ReposPage() {
               <span className="db-notif-dot" />
             </div>
 
-            <div className="db-topbar-av">LE</div>
+            <div className="db-topbar-av">{initials}</div>
           </div>
         </header>
 
+        {syncMsg && (
+          <div style={{ fontSize: '.78rem', color: 'var(--text-muted)', padding: '.4rem 1.5rem' }}>
+            {syncMsg}
+          </div>
+        )}
+
         <section className="db-body">
           <div className="db-page-hd">
-            <h1 className="db-page-title">Repositorios</h1>
+            <h1 className="db-page-title">Repositorios conectados</h1>
             <div className="db-page-meta">
-              <span>Seguimiento técnico de proyectos conectados</span>
+              <span>{repos.length} repos totales</span>
               <span className="db-dot" />
-              <span className="db-meta-hi">12 analizados por IA</span>
+              <span>{publicCount} públicos · {privateCount} privados</span>
+              <span className="db-dot" />
+              <span className="db-meta-hi">{languages.length} lenguajes detectados</span>
             </div>
           </div>
 
+          {loading && (
+            <div style={{ marginBottom: '1rem', fontSize: '.8rem', color: 'var(--text-muted)' }}>
+              Cargando repositorios…
+            </div>
+          )}
+          {error && (
+            <div style={{ marginBottom: '1rem', fontSize: '.8rem', color: 'var(--amber)' }}>
+              {error}
+            </div>
+          )}
+
+          {/* KPIs sin commits */}
           <div className="db-kpis">
             <div className="db-kpi">
               <div className="db-kpi-top">
                 <div className="db-kpi-ico db-kpi-ico--amber"><IcGithub /></div>
-                <span className="db-kpi-trend">↑ +2</span>
+                <span className="db-kpi-trend">Repos</span>
               </div>
-              <div className="db-kpi-val">12</div>
-              <div className="db-kpi-lbl">Repos conectados</div>
-              <div className="db-kpi-sub">sincronizados con tu perfil</div>
+              <div className="db-kpi-val">{repos.length}</div>
+              <div className="db-kpi-lbl">Total conectados</div>
+              <div className="db-kpi-sub">sincronizados desde GitHub</div>
             </div>
 
             <div className="db-kpi">
               <div className="db-kpi-top">
-                <div className="db-kpi-ico db-kpi-ico--green"><IcActivity /></div>
-                <span className="db-kpi-trend">↑ 561</span>
+                <div className="db-kpi-ico db-kpi-ico--blue"><IcCode /></div>
+                <span className="db-kpi-trend">Lenguajes</span>
               </div>
-              <div className="db-kpi-val">561</div>
-              <div className="db-kpi-lbl">Commits totales</div>
-              <div className="db-kpi-sub">en repos priorizados</div>
-            </div>
-
-            <div className="db-kpi">
-              <div className="db-kpi-top">
-                <div className="db-kpi-ico db-kpi-ico--blue"><IcStar /></div>
-                <span className="db-kpi-trend">↑ 90 prom.</span>
-              </div>
-              <div className="db-kpi-val">90</div>
-              <div className="db-kpi-lbl">Top score IA</div>
-              <div className="db-kpi-sub">en proyectos mejor evaluados</div>
-            </div>
-
-            <div className="db-kpi">
-              <div className="db-kpi-top">
-                <div className="db-kpi-ico db-kpi-ico--amber"><IcCode /></div>
-                <span className="db-kpi-trend">↑ 5</span>
-              </div>
-              <div className="db-kpi-val">5</div>
+              <div className="db-kpi-val">{languages.length}</div>
               <div className="db-kpi-lbl">Stacks detectados</div>
-              <div className="db-kpi-sub">Java, TS, React, Python, Go</div>
+              <div className="db-kpi-sub">según repos conectados</div>
+            </div>
+
+            <div className="db-kpi">
+              <div className="db-kpi-top">
+                <div className="db-kpi-ico db-kpi-ico--amber"><IcStar /></div>
+                <span className="db-kpi-trend">Visibilidad</span>
+              </div>
+              <div className="db-kpi-val">{publicCount}</div>
+              <div className="db-kpi-lbl">Repos públicos</div>
+              <div className="db-kpi-sub">{privateCount} privados</div>
             </div>
           </div>
 
           <div className="db-grid">
             <div className="db-col">
+              {/* Filtros */}
               <div className="db-card">
                 <div className="db-card-hd">
                   <div className="db-card-title">
-                    <IcGithub /> Repositorios analizados
+                    <IcCode /> Filtros
                   </div>
+                </div>
 
-                  <button className="db-card-link">
-                    Ver GitHub <IcChevR />
-                  </button>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1.2fr) minmax(0, 1.2fr)',
+                    gap: '.75rem',
+                  }}
+                >
+                  <input
+                    type="text"
+                    placeholder="Buscar por nombre o descripción..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    style={{
+                      padding: '.55rem .7rem',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border)',
+                      background: 'var(--surface-2)',
+                      color: 'var(--text)',
+                      fontSize: '.8rem',
+                    }}
+                  />
+
+                  <select
+                    value={languageFilter}
+                    onChange={(e) => setLanguageFilter(e.target.value)}
+                    style={{
+                      padding: '.55rem .7rem',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border)',
+                      background: 'var(--surface-2)',
+                      color: 'var(--text)',
+                      fontSize: '.8rem',
+                    }}
+                  >
+                    <option value="all">Todos los lenguajes</option>
+                    {languages.map((lang) => (
+                      <option key={lang} value={lang}>
+                        {lang}
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={visibilityFilter}
+                    onChange={(e) => setVisibilityFilter(e.target.value)}
+                    style={{
+                      padding: '.55rem .7rem',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border)',
+                      background: 'var(--surface-2)',
+                      color: 'var(--text)',
+                      fontSize: '.8rem',
+                    }}
+                  >
+                    <option value="all">Todos (públicos/privados)</option>
+                    <option value="public">Sólo públicos</option>
+                    <option value="private">Sólo privados</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Tabla de repos (sin commits) */}
+              <div className="db-card">
+                <div className="db-card-hd">
+                  <div className="db-card-title">
+                    <IcGithub /> Lista de repositorios
+                  </div>
+                  <span className="db-pill db-pill--blue">
+                    {filteredRepos.length} mostrados
+                  </span>
                 </div>
 
                 <div className="db-tbl-wrap">
@@ -294,116 +425,136 @@ export default function ReposPage() {
                       <tr>
                         <th>Repositorio</th>
                         <th>Lenguaje</th>
-                        <th>Commits</th>
-                        <th>Score IA</th>
-                        <th>Actualizado</th>
+                        <th>Visibilidad</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {REPOS.map((repo) => (
-                        <tr key={repo.name}>
+                      {filteredRepos.map((r) => (
+                        <tr key={r.id || r.name}>
                           <td>
-                            <span className="db-repo">{repo.name}</span>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '.1rem' }}>
+                              <a
+                                href={r.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="db-repo"
+                              >
+                                {r.name}
+                              </a>
+                              {r.description && (
+                                <span
+                                  className="db-tmuted"
+                                  style={{ maxWidth: '380px', fontSize: '.72rem' }}
+                                >
+                                  {r.description}
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td>
                             <span className="db-lang">
-                              <span className="db-lang-dot" style={{ background: repo.dot }} />
-                              {repo.lang}
+                              <span
+                                className="db-lang-dot"
+                                style={{ backgroundColor: '#38bdf8' }}
+                              />
+                              {r.mainLanguage || 'N/A'}
                             </span>
                           </td>
-                          <td className="db-tnum">{repo.commits}</td>
                           <td>
-                            <span className={badgeClass(repo.level)}>{repo.score}</span>
+                            <span
+                              className={pillClass(r.isPrivate ? 'amber' : 'green')}
+                              style={{ fontSize: '.7rem' }}
+                            >
+                              {r.isPrivate ? 'Privado' : 'Público'}
+                            </span>
                           </td>
-                          <td className="db-tmuted">{repo.updated}</td>
                         </tr>
                       ))}
+
+                      {!loading && !filteredRepos.length && (
+                        <tr>
+                          <td
+                            colSpan={3}
+                            className="db-tmuted"
+                            style={{ textAlign: 'center', padding: '1.5rem 0' }}
+                          >
+                            No se encontraron repositorios con esos filtros.
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
               </div>
-
-              <div className="db-card">
-                <div className="db-card-hd">
-                  <div className="db-card-title">
-                    <IcStar /> Insights del análisis
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
-                  {INSIGHTS.map((item) => (
-                    <div
-                      key={item}
-                      style={{
-                        background: 'var(--surface-2)',
-                        border: '1px solid var(--border)',
-                        borderRadius: '10px',
-                        padding: '1rem',
-                        fontSize: '.82rem',
-                        color: 'var(--text-muted)',
-                        lineHeight: 1.65,
-                      }}
-                    >
-                      {item}
-                    </div>
-                  ))}
-                </div>
-              </div>
             </div>
 
+            {/* Columna derecha: sólo resumen repos / tip */}
             <div className="db-col">
               <div className="db-card">
                 <div className="db-card-hd">
                   <div className="db-card-title">
-                    <IcCode /> Lenguajes dominantes
-                  </div>
-                </div>
-
-                <div className="db-skills">
-                  {TOP_LANGS.map((lang) => (
-                    <div key={lang.name} className="db-skill">
-                      <div className="db-skill-name">{lang.name}</div>
-
-                      <div className="db-skill-bg">
-                        <div
-                          className={fillClass(lang.level)}
-                          style={{ width: `${lang.pct}%` }}
-                        />
-                      </div>
-
-                      <div className={pctClass(lang.level)}>{lang.pct}%</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="db-card">
-                <div className="db-card-hd">
-                  <div className="db-card-title">
-                    <IcDown /> Acciones rápidas
+                    <IcUsers /> Resumen rápido
                   </div>
                 </div>
 
                 <div style={{ display: 'grid', gap: '.75rem' }}>
-                  <button className="db-tbtn db-tbtn--primary" style={{ width: '100%', justifyContent: 'center' }}>
-                    Exportar análisis
-                  </button>
-
-                  <button
-                    className="db-tbtn"
-                    style={{ width: '100%', justifyContent: 'center' }}
-                    onClick={() => navigate('/cv')}
+                  <div
+                    style={{
+                      background: 'var(--surface-2)',
+                      borderRadius: '10px',
+                      border: '1px solid var(--border)',
+                      padding: '1rem',
+                    }}
                   >
-                    Usar en mi CV
-                  </button>
+                    <div style={{ fontSize: '.75rem', color: 'var(--text-faint)' }}>
+                      Repos públicos
+                    </div>
+                    <div
+                      style={{
+                        fontFamily: 'var(--font-display)',
+                        fontSize: '1.8rem',
+                        fontWeight: 800,
+                        letterSpacing: '-.03em',
+                        marginTop: '.1rem',
+                      }}
+                    >
+                      {publicCount}
+                    </div>
+                    <div
+                      style={{
+                        marginTop: '.3rem',
+                        fontSize: '.75rem',
+                        color: 'var(--text-muted)',
+                      }}
+                    >
+                      Visibles para CV y perfil público.
+                    </div>
+                  </div>
 
-                  <button
-                    className="db-tbtn"
-                    style={{ width: '100%', justifyContent: 'center' }}
-                    onClick={() => navigate('/dashboard')}
+                  <div
+                    style={{
+                      background: 'var(--surface-2)',
+                      borderRadius: '10px',
+                      border: '1px solid var(--border)',
+                      padding: '1rem',
+                    }}
                   >
-                    Volver al dashboard
-                  </button>
+                    <div style={{ fontSize: '.75rem', color: 'var(--text-faint)' }}>
+                      Tip
+                    </div>
+                    <div
+                      style={{
+                        marginTop: '.3rem',
+                        fontSize: '.8rem',
+                        color: 'var(--text-muted)',
+                        lineHeight: 1.7,
+                      }}
+                    >
+                      Prioriza 2–3 repos públicos sólidos (backend, frontend y
+                      un proyecto personal) y mantén README y descripciones al día:
+                      esto es lo que más verán recruiters y el resto de DevRoom.
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
