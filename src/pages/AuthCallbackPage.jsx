@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import { useAuthStore } from '../store/authStore'
 
+
 export default function AuthCallbackPage() {
   const navigate  = useNavigate()
   const setToken  = useAuthStore((s) => s.setToken)
@@ -64,4 +65,6 @@ export default function AuthCallbackPage() {
       </p>
     </div>
   )
+
+  
 }
