@@ -5,7 +5,8 @@ import { useAuthStore } from '../store/authStore.js'
 
 
 const GITHUB_CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID
-const REDIRECT_URI = import.meta.env.VITE_GITHUB_REDIRECT_URI || 'http://localhost:5173/auth/callback'
+// Elimina el fallback completamente
+const REDIRECT_URI = import.meta.env.VITE_GITHUB_REDIRECT_URI
 
 function generateState() {
   return Math.random().toString(36).substring(2, 15)
